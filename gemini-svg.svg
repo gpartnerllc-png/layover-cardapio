@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Fundo escuro com cantos arredondados -->
+  <rect width="512" height="512" rx="110" ry="110" fill="#0b0f14" />
+  
+  <!-- Ícone da Taça / Âmbar em linhas elegantes -->
+  <path d="M 150 115 
+           L 362 115 
+           C 350 250, 310 320, 256 345 
+           C 202 320, 162 250, 150 115 Z" 
+        fill="none" 
+        stroke="#f5b335" 
+        stroke-width="28" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" />
+        
+  <path d="M 256 345 L 256 410" 
+        fill="none" 
+        stroke="#f5b335" 
+        stroke-width="28" 
+        stroke-linecap="round" />
+        
+  <path d="M 180 410 L 332 410" 
+        fill="none" 
+        stroke="#f5b335" 
+        stroke-width="28" 
+        stroke-linecap="round" />
+</svg>
