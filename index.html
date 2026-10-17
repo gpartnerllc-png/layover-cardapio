@@ -46,6 +46,10 @@
     <div id="categories" class="flex gap-2 overflow-x-auto pb-3 mb-4"></div>
     <div id="menu-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
 
+    <div class="text-center mt-6 mb-4">
+      <button id="btn-load-more" onclick="loadMore()" class="btn-3d bg-white border border-slate-200 text-slate-700 px-6 py-2.5 text-sm hidden">Carregar mais</button>
+    </div>
+
     <div id="cart-bar" class="fixed bottom-4 left-4 right-4 md:left-auto md:right-6 md:w-72 glass-card rounded-2xl p-3 hidden text-sm font-bold">
       <div class="flex justify-between"><span id="cart-count">0</span><span id="cart-total" class="text-google-green">R$ 0,00</span></div>
     </div>
@@ -53,6 +57,7 @@
 
   <script>
     const API_BASE = 'https://cardapio-completo.contatodroppfy.workers.dev';
+    const PAGE_SIZE = 12;
 
     const categories = [
   { id: 'happy-mandaka', title: 'Happy Mandaka' },
@@ -476,9 +481,21 @@ const menuItems = [
 ];
 
 
+    
+    // Pré-agrupa por categoria (troca de aba fica instantânea)
+    const categoryMap = {};
+    menuItems.forEach(item => {
+      if (!categoryMap[item.category_id]) categoryMap[item.category_id] = [];
+      categoryMap[item.category_id].push(item);
+    });
+
     let cart = [];
-    let currentCategory = 'all';
+    let currentCategory = categories[0]?.id || 'happy-mandaka';
     let currentMesa = '';
+    let currentSearch = '';
+    let visibleCount = PAGE_SIZE;
+    const categoryCache = {}; // cache do HTML renderizado
+    let filteredItems = [];
 
     // Mesas
     const mesaSel = document.getElementById('mesa-select');
@@ -495,33 +512,59 @@ const menuItems = [
 
     function updateBtn() {
       const ok = currentMesa && cart.length;
-      document.getElementById('btn-enviar').disabled = !ok;
-      document.getElementById('btn-enviar').classList.toggle('opacity-50', !ok);
+      const btn = document.getElementById('btn-enviar');
+      btn.disabled = !ok;
+      btn.classList.toggle('opacity-50', !ok);
+    }
+
+    function getFiltered() {
+      const list = categoryMap[currentCategory] || [];
+      if (!currentSearch) return list;
+      const q = currentSearch.toLowerCase();
+      return list.filter(i => i.name.toLowerCase().includes(q) || (i.description||'').toLowerCase().includes(q));
     }
 
     function renderCategories() {
-      const all = [{id:'all', title:'✨ Todos'}].concat(categories);
-      document.getElementById('categories').innerHTML = all.map(c => 
+      document.getElementById('categories').innerHTML = categories.map(c => 
         `<button onclick="setCategory('${c.id}')" class="btn-3d px-3 py-1.5 text-[11px] whitespace-nowrap ${currentCategory===c.id?'bg-google-yellow text-slate-900':'bg-white border'}">${c.title}</button>`
       ).join('');
     }
 
-    function renderMenu(q = '') {
-      const filtered = menuItems.filter(i =>
-        (currentCategory === 'all' || i.category_id === currentCategory) &&
-        (i.name.toLowerCase().includes(q.toLowerCase()) || (i.description||'').toLowerCase().includes(q.toLowerCase()))
-      );
-      document.getElementById('menu-grid').innerHTML = filtered.map(item => `
-        <div class="glass-card rounded-2xl overflow-hidden flex flex-col text-xs">
-          <div class="relative h-32 bg-slate-100">
-            <img src="${item.image}" alt="${item.name}" class="w-full h-full object-cover" loading="lazy" decoding="async" width="200" height="160" />
-            <span class="absolute bottom-1.5 left-1.5 bg-white/95 text-google-green font-mono text-[10px] px-2 py-0.5 rounded-full font-bold">R$ ${item.price.toFixed(2).replace('.',',')}</span>
-          </div>
-          <div class="p-2.5 flex-1 flex flex-col">
-            <h3 class="font-bold leading-tight line-clamp-2">${item.name}</h3>
-            <button onclick="addToCart('${item.id}')" class="btn-3d mt-2 bg-google-blue text-white py-1.5 text-[11px]">Adicionar</button>
-          </div>
-        </div>`).join('') || '<p class="col-span-full text-center text-slate-400 py-10">Nenhum item.</p>';
+    function renderMenu() {
+      filteredItems = getFiltered();
+      const toShow = filteredItems.slice(0, visibleCount);
+      const cacheKey = currentCategory + '|' + visibleCount + '|' + currentSearch;
+
+      if (categoryCache[cacheKey]) {
+        document.getElementById('menu-grid').innerHTML = categoryCache[cacheKey];
+      } else {
+        const html = toShow.map(item => `
+          <div class="glass-card rounded-2xl overflow-hidden flex flex-col text-xs">
+            <div class="relative h-32 bg-slate-100">
+              <img src="${item.image.replace(/w_\d+/, 'w_180').replace(/w=\d+/, 'w=180')}" alt="${item.name}" class="w-full h-full object-cover" loading="lazy" decoding="async" width="180" height="144" fetchpriority="low" />
+              <span class="absolute bottom-1.5 left-1.5 bg-white/95 text-google-green font-mono text-[10px] px-2 py-0.5 rounded-full font-bold">R$ ${item.price.toFixed(2).replace('.',',')}</span>
+            </div>
+            <div class="p-2.5 flex-1 flex flex-col">
+              <h3 class="font-bold leading-tight line-clamp-2">${item.name}</h3>
+              <button onclick="addToCart('${item.id}')" class="btn-3d mt-2 bg-google-blue text-white py-1.5 text-[11px]">Adicionar</button>
+            </div>
+          </div>`).join('') || '<p class="col-span-full text-center text-slate-400 py-10">Nenhum item.</p>';
+        categoryCache[cacheKey] = html;
+        document.getElementById('menu-grid').innerHTML = html;
+      }
+
+      const btnMore = document.getElementById('btn-load-more');
+      if (visibleCount < filteredItems.length) {
+        btnMore.classList.remove('hidden');
+        btnMore.innerText = `Carregar mais (${filteredItems.length - visibleCount} restantes)`;
+      } else {
+        btnMore.classList.add('hidden');
+      }
+    }
+
+    function loadMore() {
+      visibleCount += PAGE_SIZE;
+      renderMenu();
     }
 
     function addToCart(id) {
@@ -558,8 +601,18 @@ const menuItems = [
       updateBtn();
     }
 
-    function setCategory(id) { currentCategory = id; renderCategories(); renderMenu(document.getElementById('search').value); }
-    function filterMenu(v) { renderMenu(v); }
+    function setCategory(id) {
+      currentCategory = id;
+      visibleCount = PAGE_SIZE;
+      renderCategories();
+      renderMenu();
+    }
+
+    function filterMenu(v) {
+      currentSearch = v;
+      visibleCount = PAGE_SIZE;
+      renderMenu();
+    }
 
     renderCategories();
     renderMenu();
